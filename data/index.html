@@ -1,0 +1,2095 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi Manager</title>
+    <link rel="stylesheet" href="css/foundation.min.css">
+    <style>
+        /* ===== GLOBAL ===== */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        body {
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* ===== PAGE LOADER ===== */
+        #pageLoader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #ffffff;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease-out;
+        }
+
+        #pageLoader.loaded {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        body.loading {
+            overflow: hidden !important;
+        }
+
+        body:not(.loading) > .grid-container:not(#pageLoader) {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+
+        body.loading>.grid-container:not(:first-child),
+        body.loading #toast {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+        }
+
+        /* =========================
+        LOADER CONTENT — UPDATED
+        ========================= */
+        .loader-content {
+            max-width: 400px;
+            padding: 0 20px;
+            text-align: center;
+        }
+
+        /* >>>>>>>>>>>>> NEW <<< */
+        #pageLoader .loader-content {
+            display:grid !important;
+            grid-template-columns: 1fr auto;
+            grid-template-rows: auto auto;
+            column-gap:12px;
+            row-gap:16px;
+            align-items:center;
+        }
+
+        .loader-icon {
+            font-size: 60px;
+            animation: pulse 2s ease-in-out infinite;
+            margin-bottom: 5px;
+            grid-column: 1 / -1;
+        }
+
+        @keyframes pulse {
+            0%,100%{transform:scale(1);opacity:1;}
+            50%{transform:scale(1.1);opacity:.8;}
+        }
+
+        .loader-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #1779ba;
+            margin-bottom: 5px;
+            grid-column: 1 / -1;
+        }
+
+        .loader-subtitle {
+            font-size: 18px;
+            color: #8a8a8a;
+            margin-bottom: -5px;
+            grid-column: 1 / -1;
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 10px;
+            background: #e6e6e6;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 0 !important;
+        }
+
+        /* >>> PAGE LOADER PROGRESS POSITION <<< */
+        #pageLoader .progress-container{
+            grid-column:1;
+            width:100%;
+            min-width:0;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #1779ba 0%, #14679e 100%);
+            border-radius: 10px;
+            width: 0%;
+            transition: width 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar::before {
+            content:'';
+            position:absolute;
+            inset:0;
+            background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.3) 50%,transparent 100%);
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0%{transform:translateX(-100%);}
+            100%{transform:translateX(100%);}
+        }
+
+        .loader-status {
+            font-size: 15px;
+            color: #1779ba;
+            font-weight: 500;
+            min-height: 20px;
+            grid-column: 1 / -1;
+            margin-top: -10px;
+            text-align: center;
+        }
+
+        /* >>> PAGE LOADER PERCENTAGE <<< */
+        .loader-percentage {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1779ba;
+            margin-top: 0 !important;
+            white-space: nowrap;
+            grid-column:2;
+            align-self:center;
+            margin-bottom: 1px;
+        }
+
+        /* ===== COUNTDOWN OVERLAY ===== */
+        #countdownLoading {
+            position: fixed !important;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 999999;
+            background: rgba(0,0,0,0.45);
+            backdrop-filter: blur(2px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #countdownLoading .loader-content {
+            display: grid !important;
+            grid-template-columns: 1fr auto !important;
+            grid-template-rows: auto auto !important;
+            column-gap: 12px;
+            row-gap: 16px;
+            align-items: center;
+            text-align: unset;
+            background: #ffffff;
+            padding: 24px 28px;
+            border-radius: 8px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.3);
+            min-width: 280px;
+        }
+
+        #countdownLoading .loader-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #1779ba;
+            grid-column: 1 / -1;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        #countdownLoading .progress-container {
+            grid-column:1;
+        }
+
+        #countdownLoading .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #1779ba, #2c83bd);
+            transition: width 0.25s ease;
+            position: relative;
+        }
+
+        #countdownLoading .progress-bar::before {
+            content:'';
+            position:absolute;
+            inset:0;
+            background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);
+            animation: shimmer 1.4s infinite;
+        }
+
+        #countdownLoading .loader-content {
+            display:grid !important;
+            grid-template-columns: 1fr auto;
+            grid-template-rows: auto auto;
+            align-items:center;
+        }
+
+        #countdownLoading .loader-percentage {
+            grid-column:2;
+            align-self:center;
+        }
+
+        /* ===== Toast ===== */
+        .toast {
+            position: fixed;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999999;
+            min-width: 300px;
+            max-width: 90vw;
+            text-align: center;
+            transition: top 0.5s ease-in-out;
+        }
+
+        .toast.show {
+            top: 30px;
+        }
+
+        body.countdown-active {
+            overflow: hidden !important;
+        }
+
+        @keyframes spinner {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, .1);
+            border-radius: 50%;
+            border-top-color: #1779ba;
+            animation: spinner 1s ease-in-out infinite;
+        }
+    </style>
+</head>
+
+<body class="loading">
+    <!-- Page Loading Screen -->
+    <div id="pageLoader">
+        <div class="loader-content">
+            <div class="loader-icon">📡</div>
+            <div class="loader-title">WiFi Manager</div>
+            <div class="loader-subtitle">Menyiapkan halaman...</div>
+            <div class="progress-container">
+                <div class="progress-bar" id="loadingProgress"></div>
+            </div>
+            <div class="loader-percentage" id="loadingPercentage">0%</div>
+            <div class="loader-status" id="loadingStatus">Mohon tunggu...</div>
+        </div>
+    </div>
+    <!-- Toast Notification using Foundation Callout -->
+    <div id="toast" class="toast callout success"></div>
+    <!-- Countdown Loading Bar (Like Page Loader) -->
+    <div id="countdownLoading" style="display: none;">
+        <div class="loader-content">
+            <div class="progress-container">
+                <div class="progress-bar" id="countdownProgressBar"></div>
+            </div>
+            <div class="loader-percentage" id="countdownPercentage">0%</div>
+            <div class="loader-status" id="countdownTitle">Mulai</div>
+        </div>
+    </div>
+    <div class="grid-container">
+        <div class="grid-x grid-padding-x grid-margin-y align-center">
+            <div class="small-12 medium-10 large-10 cell">
+                <!-- Header -->
+                <div class="grid-x grid-padding-y">
+                    <div class="small-12 medium-12 large-12 text-center cell">
+                        <h3>📡 WiFi Manager</h3>
+                        <p class="subheader">
+                            Pengaturan otomatis melalui WiFi
+                        </p>
+                    </div>
+                </div>
+                <div class="small-12 medium-12 large-12 cell">
+                    <ul class="tabs" data-tabs id="example-tabs">
+                        <li class="tabs-title is-active">
+                            <a href="#home" aria-selected="true">BERANDA</a>
+                        </li>
+                        <li class="tabs-title">
+                            <a href="#wifi">WIFI</a>
+                        </li>
+                        <li class="tabs-title">
+                            <a href="#time">WAKTU</a>
+                        </li>
+                        <li class="tabs-title">
+                            <a href="#factory">RESET</a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="tabs-content" data-tabs-content="example-tabs">
+                    <div class="tabs-panel is-active" id="home">
+                        <div class="grid-x grid-padding-x">
+                            <div class="small-12 medium-12 large-12 text-center cell">
+                                <div class="callout">
+                                    <div class="grid-x grid-margin-x grid-margin-y">
+                                        <div class="small-12 medium-12 large-12 cell">
+                                            <div class="grid-x grid-padding-x">
+                                                <div class="small-12 medium-12 large-12 text-center cell">
+                                                    <h5>
+                                                        <strong>Status Perangkat</strong>
+                                                    </h5>
+                                                    <p class="help-text">
+                                                        Pembaruan status perangkat secara realtime
+                                                    </p>
+                                                    <div class="infoheader"></div>
+                                                </div>
+                                            </div>
+                                            <div class="grid-x grid-margin-x grid-padding-y align-center">
+                                                <div class="small-12 medium-12 large-12 cell">
+                                                    <div class="grid-x grid-margin-x no-padding-y cell">
+                                                        <div class="small-12 medium-6 large-6 cell text-left">
+                                                            <p>
+                                                                <strong>Jaringan WiFi:</strong>
+                                                                <span id="wifiName">Menyiapkan...</span>
+                                                            </p>
+                                                            <p>
+                                                                <strong>Alamat IP:</strong>
+                                                                <span id="ipAddress">Tidak tersedia</span>
+                                                            </p>
+                                                            <p>
+                                                                <strong>Status WiFi:</strong>
+                                                                <span id="internetStatus" class="label warning">Menghubungkan…</span>
+                                                            </p>
+                                                            <p>
+                                                                <strong>Sinyal:</strong>
+                                                                <span id="rssiValue">-</span>
+                                                            </p>
+                                                        </div>
+                                                        <div class="small-12 medium-6 large-6 cell text-left">
+                                                            <p>
+                                                                <strong>Status NTP:</strong>
+                                                                <span id="ntpStatus">Tidak sinkron</span>
+                                                            </p>
+                                                            <p>
+                                                                <strong>Server NTP:</strong>
+                                                                <span id="ntpServerUsed">Tidak tersedia</span>
+                                                            </p>
+                                                            <p>
+                                                                <strong>Waktu:</strong>
+                                                                <span id="currentTime">00:00:00</span>
+                                                            </p>
+                                                            <p>
+                                                                <strong>Tanggal:</strong>
+                                                                <span id="currentDate">01/01/2000</span>
+                                                            </p>
+                                                            <p>
+                                                                <strong>Waktu Aktif:</strong>
+                                                                <span id="uptime">00:00:00</span>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="small-12 medium-12 large-12 cell">
+                                                    <button class="button secondary expanded" onclick="restartDevice()">Mulai Ulang Perangkat </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tabs-panel" id="wifi">
+                        <div class="grid-x grid-padding-x">
+                            <div class="small-12 medium-12 large-12 text-center cell">
+                                <div class="callout">
+                                    <div class="grid-x grid-margin-x grid-margin-y">
+                                        <div class="small-12 medium-12 large-12 cell">
+                                            <div class="grid-x grid-padding-x">
+                                                <div class="small-12 medium-12 large-12 text-center cell">
+                                                    <h5>
+                                                        <strong>WiFi</strong>
+                                                    </h5>
+                                                    <p class="help-text">
+                                                        Pengaturan jaringan WiFi
+                                                    </p>
+                                                    <div class="infoheader"></div>
+                                                </div>
+                                            </div>
+                                            <div class="grid-x grid-margin-x grid-margin-y align-center ">
+                                                <div class="small-12 medium-6 large-6 cell">
+                                                    <div class="grid-x grid-padding-x">
+                                                        <div class="small-12 medium-12 large-12 text-center cell">
+                                                            <h5>
+                                                                <strong>📡 WiFi Router</strong>
+                                                            </h5>
+                                                            <p class="help-text">
+                                                                SSID WiFi untuk mendapatkan koneksi internet
+                                                            </p>
+                                                            <div class="info"></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="grid-x grid-margin-x">
+                                                        <div class="small-12 medium-12 large-12 cell">
+                                                            <label>SSID WiFi Router</label>
+                                                            <input type="text" id="wifiSSID" placeholder="Masukkan SSID WiFi" autocomplete="off" data-form="wifi-credentials">
+                                                        </div>
+                                                        <div class="small-12 medium-12 large-12 cell">
+                                                            <label>Password WiFi</label>
+                                                            <input type="password" id="wifiPassword" placeholder="Masukkan password WiFi" autocomplete="new-password" data-form="wifi-credentials">
+                                                        </div>
+                                                        <div class="small-6 medium-6 large-6 cell">
+                                                            <button class="button secondary expanded" onclick="setWiFi()"> Simpan </button>
+                                                        </div>
+                                                        <div class="small-6 medium-6 large-6 cell">
+                                                            <button class="button secondary expanded" onclick="clearWiFiForm()"> Batal </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="small-12 medium-6 large-6 cell">
+                                                    <div class="grid-x grid-padding-x">
+                                                        <div class="small-12 medium-12 large-12 text-center cell">
+                                                            <h5>
+                                                                <strong>📶 Access Point</strong>
+                                                            </h5>
+                                                            <p class="help-text">
+                                                                SSID Access Point untuk terlihat perangkat untuk mengatur
+                                                            </p>
+                                                            <div class="info"></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="grid-x grid-margin-x">
+                                                        <div class="small-12 medium-12 large-12 cell">
+                                                            <label>SSID Access Point</label>
+                                                            <input type="text" id="apSSID" placeholder="Masukkan SSID AP"
+                                                                autocomplete="off" data-form="ap-credentials">
+                                                        </div>
+                                                        <div class="small-12 medium-12 large-12 cell">
+                                                            <label>Password Access Point</label>
+                                                            <input type="password" id="apPassword" placeholder="Masukkan password AP (minimal 8 karakter)" autocomplete="new-password" data-form="ap-credentials">
+                                                        </div>
+                                                        <div class="small-6 medium-6 large-6 cell">
+                                                            <button class="button secondary expanded" onclick="setAP()"> Simpan
+                                                            </button>
+                                                        </div>
+                                                        <div class="small-6 medium-6 large-6 cell">
+                                                            <button class="button secondary expanded" onclick="clearAPForm()"> Batal </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="small-12 medium-6 large-6 cell">
+                                                    <div class="grid-x grid-margin-x">
+                                                        <div class="small-12 medium-12 large-12 text-center cell">
+                                                            <h5>
+                                                                <strong>🌐 Konfigurasi Jaringan Access Point</strong>
+                                                            </h5>
+                                                            <p class="help-text">
+                                                                IP Address server digunakan sebagai halaman pengaturan
+                                                            </p>
+                                                            <div class="info"></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="grid-x grid-margin-x">
+                                                        <div class="small-12 medium-12 large-12 cell">
+                                                            <label>IP Address Access Point</label>
+                                                            <input type="text" id="apIP" placeholder="192.168.100.1" autocomplete="off" data-form="network-config">
+                                                        </div>
+                                                        <div class="small-12 medium-12 large-12 cell">
+                                                            <label>Gateway</label>
+                                                            <input type="text" id="gatewayIP" placeholder="192.168.100.1" autocomplete="off" data-form="network-config">
+                                                        </div>
+                                                        <div class="small-12 medium-12 large-12 cell">
+                                                            <label>Subnet Mask</label>
+                                                            <input type="text" id="subnetMask" placeholder="255.255.255.0" autocomplete="off" data-form="network-config">
+                                                        </div>
+                                                        <div class="small-6 medium-6 large-6 cell">
+                                                            <button class="button secondary expanded" onclick="setAPNetwork()">Simpan</button>
+                                                        </div>
+                                                        <div class="small-6 medium-6 large-6 cell">
+                                                            <button class="button secondary expanded" onclick="clearDHCPForm()">Batal</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tabs-panel" id="time">
+                        <div class="grid-x grid-padding-x">
+                            <div class="small-12 medium-12 large-12 text-center cell">
+                                <div class="callout">
+                                    <div class="grid-x grid-margin-x grid-margin-y">
+                                        <div class="small-12 medium-12 large-12 cell">
+                                            <div class="grid-x grid-padding-x">
+                                                <div class="small-12 medium-12 large-12 text-center cell">
+                                                    <h5>
+                                                        <strong>Waktu & Sinkronisasi</strong>
+                                                    </h5>
+                                                    <p class="help-text">
+                                                        Waktu secara manual atau realtime
+                                                    </p>
+                                                    <div class="infoheader"></div>
+                                                </div>
+                                            </div>
+                                            <div class="grid-x grid-margin-x grid-margin-y align-center">
+                                                <div class="small-12 medium-6 large-6 cell">
+                                                    <div class="small-12 medium-12 large-12 cell">
+                                                        <h6>
+                                                            <strong>📱 Pembaruan Manual</strong>
+                                                        </h6>
+                                                        <p class="help-text">
+                                                            Waktu diperbarui dari perangkat
+                                                        </p>
+                                                        <div class="info"></div>
+                                                    </div>
+                                                    <div class="small-12 medium-12 large-12 cell">
+                                                        <button class="button secondary expanded" onclick="syncTime()"> Perbarui Waktu </button>
+                                                    </div>
+
+                                                </div>
+                                                <div class="small-12 medium-6 large-6 cell">
+                                                    <div class="small-12 medium-12 large-12 cell">
+                                                        <h6>
+                                                            <strong>🌐 Pembaruan Otomatis (NTP) <span class="label success">AUTO</span>
+                                                            </strong>
+                                                        </h6>
+                                                        <p class="help-text">
+                                                            Waktu diperbarui otomatis saat terhubung ke internet
+                                                        </p>
+                                                        <div class="info"></div>
+                                                    </div>
+                                                    <div class="small-12 medium-12 large-12 cell">
+                                                        <p class="help-text">
+                                                            🔄 Perbarui otomatis setiap 1 jam <br>
+                                                            🗄️ Beberapa server cadangan <br>
+                                                            🌐 Zona waktu: UTC
+                                                            <span id="timezoneDisplayText">+7</span>
+                                                            <input type="text" id="timezoneInput" value="+7" style="display: none; width: 60px; height: 25px; padding: 2px 5px; margin: 0 5px; text-align: center; font-weight: bold;" pattern="^[+-]?\d+$" maxlength="3">
+                                                            <button id="timezoneBtn" onclick="toggleTimezoneEdit()" style="margin-left: -5px; padding: 5px 10px; line-height: 1;" title="Edit Zona Waktu"> 🕐 </button>
+                                                            <button id="timezoneCancelBtn" onclick="cancelTimezoneEdit()" style="display: none; margin-left: -5px; padding: 5px 10px; line-height: 1;" title="Batal Edit"> ✖ </button>
+                                                        </p>
+                                                        <p class="help-text"
+                                                            style="margin-top: 5px; font-size: 11px; color: #666;">
+                                                            🇮🇩 WIB = +7 | WITA = +8 | WIT = +9
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tabs-panel" id="factory">
+                        <div class="grid-x grid-padding-x">
+                            <div class="small-12 medium-12 large-12 text-center cell">
+                                <div class="callout">
+                                    <div class="grid-x grid-margin-x grid-margin-y">
+                                        <div class="small-12 medium-12 large-12 cell">
+                                            <div class="grid-x grid-padding-x">
+                                                <div class="small-12 medium-12 large-12 text-center cell">
+                                                    <h5>
+                                                        <strong>Reset</strong>
+                                                    </h5>
+                                                    <p class="help-text">
+                                                        Pengaturan hapus data tidak dapat dibatalkan
+                                                    </p>
+                                                    <div class="infoheader"></div>
+                                                </div>
+                                            </div>
+                                            <div class="grid-x grid-margin-x grid-margin-y align-center">
+                                                <div class="small-12 medium-12 large-12 cell">
+                                                    <p>
+                                                        <strong>Peringatan</strong> Tindakan ini menghapus
+                                                        seluruh data dan tidak dapat dibatalkan
+                                                    </p>
+                                                    <p class="help-text">
+                                                        📶 kredensial WiFi <br>
+                                                        📡 Konfigurasi Access Point <br>
+                                                        ⏱️ Waktu dan tanggal
+                                                    </p>
+                                                </div>
+                                                <div class="small-12 medium-12 large-12 cell">
+                                                    <button class="button secondary expanded" onclick="resetSettings()">
+                                                        Reset </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid-x grid-padding-y">
+                    <div class="small-12 medium-12 large-12 text-center cell">
+                        <h6>
+                            <strong>GONIT: GLOBAL NETWORK IDENTIFICATION TECHNOLOGY</strong>
+                        </h6>
+                        <span id="tahun"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tahunAwal = 2025;
+        const tahunSekarang = new Date().getFullYear();
+
+        document.getElementById("tahun").textContent =
+            tahunAwal + " - " + tahunSekarang;
+
+        // ================================
+        // LOADING MANAGER
+        // ================================
+        const LoadingManager = {
+            totalSteps: 2,
+            currentStep: 0,
+            steps: [{
+                name: 'UI',
+                progress: 0
+            }, {
+                name: 'Action',
+                progress: 50
+            }],
+            updateProgress(stepIndex, statusText) {
+                const progress = this.steps[stepIndex].progress;
+                const progressBar = document.getElementById('loadingProgress');
+                const progressContainer = progressBar?.closest('.progress');
+                const percentage = document.getElementById('loadingPercentage');
+                const status = document.getElementById('loadingStatus');
+
+                if (progressBar) progressBar.style.width = progress + '%';
+                if (progressContainer) progressContainer.setAttribute('aria-valuenow', progress);
+                if (percentage) percentage.textContent = progress + '%';
+                if (status) status.textContent = statusText || this.steps[stepIndex].name;
+            },
+            completeLoading() {
+                const loader = document.getElementById('pageLoader');
+                const progressBar = document.getElementById('loadingProgress');
+                const progressContainer = progressBar?.closest('.progress');
+                const percentage = document.getElementById('loadingPercentage');
+                const status = document.getElementById('loadingStatus');
+
+                if (progressBar) progressBar.style.width = '100%';
+                if (progressContainer) progressContainer.setAttribute('aria-valuenow', 100);
+                if (percentage) percentage.textContent = '100%';
+                if (status) status.textContent = 'Siap';
+
+                setTimeout(() => {
+                    if (loader) {
+                        loader.classList.add('loaded');
+                        document.body.classList.remove('loading');
+                        setTimeout(() => {
+                            loader.style.display = 'none';
+                        }, 500);
+                    }
+                }, 300);
+            }
+        };
+        function forceRemoveLoadingState() {
+            document.body.classList.remove('loading');
+            document.body.style.overflow = '';
+            document.body.style.height = '';
+            document.body.style.maxHeight = '';
+            document.body.style.position = '';
+            document.body.style.width = '';
+            document.body.style.top = '';
+            document.body.style.left = '';
+
+            const loader = document.getElementById('pageLoader');
+            if (loader) {
+                loader.style.display = 'none';
+            }
+        }
+        const cssLoaded = new Promise((resolve) => {
+            const checkCSS = setInterval(() => {
+                const testDiv = document.createElement('div');
+                testDiv.className = 'grid-container';
+                document.body.appendChild(testDiv);
+                const hasCSS = getComputedStyle(testDiv).width !== '100%';
+                document.body.removeChild(testDiv);
+                if (hasCSS) {
+                    clearInterval(checkCSS);
+                    resolve();
+                }
+            }, 50);
+            setTimeout(() => {
+                clearInterval(checkCSS);
+                resolve();
+            }, 5000);
+        });
+        // ================================
+        // VARIABEL GLOBAL
+        // ================================
+        let isOnline = false;
+        let loadAttempts = 0;
+        const MAX_LOAD_ATTEMPTS = 3;
+        let isUserLocalAP = true;
+        let isLoadingDeviceStatus = false;
+        let serverTimestamp = 0;
+        let localStartTime = 0;
+        let serverUptimeStart = 0;
+        let lastSyncTime = 0;
+        let timezoneConfig = {
+            offset: 7
+        };
+
+        (function checkConnectionType() {
+            fetch('/api/connection-type')
+                .then(response => response.json())
+                .then(data => {
+                    isUserLocalAP = data.isLocalAP;
+
+                })
+                .catch(error => {
+                    isUserLocalAP = true;
+                });
+        })();
+        // ================================
+        // TAB CLICK HANDLER - RELOAD SETIAP KALI
+        // ================================
+        function handleTabClick(tabName) {
+            switch (tabName) {
+                case 'home':
+                    loadHomeTab();
+                    break;
+                case 'wifi':
+                    loadWiFiTab();
+                    break;
+                case 'time':
+                    loadTimeTab();
+                    break;
+                case 'factory':
+                    break;
+                default:
+            }
+        }
+        // ================================
+        // LOAD HOME TAB DATA
+        // ================================
+        async function loadHomeTab() {
+            try {
+                await updateDeviceStatus();
+            } catch (error) { }
+        }
+        // ================================
+        // LOAD WIFI TAB DATA
+        // ================================
+        async function loadWiFiTab() {
+            try {
+                await loadWiFiConfig();
+            } catch (error) { }
+        }
+        // ================================
+        // LOAD TIME TAB DATA
+        // ================================
+        async function loadTimeTab() {
+            try {
+                await loadTimezoneConfig();
+            } catch (error) { }
+        }
+        // ================================
+        // ================================
+        // ================================
+        // ================================
+        // FUNCTON CLOCK REAL-TIME
+        // ================================
+        function getCurrentTime() {
+            if (serverTimestamp === 0 || localStartTime === 0) {
+                return null;
+            }
+            const elapsedMs = Date.now() - localStartTime;
+            const currentTimestamp = serverTimestamp + Math.floor(elapsedMs / 1000);
+            return new Date(currentTimestamp * 1000);
+        }
+
+        function getCurrentUptime() {
+            if (serverUptimeStart === 0 || localStartTime === 0) {
+                return 0;
+            }
+            const elapsedMs = Date.now() - localStartTime;
+            return serverUptimeStart + Math.floor(elapsedMs / 1000);
+        }
+
+        function formatTime(date) {
+            if (!date) return '00:00:00';
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            return `${hours}:${minutes}:${seconds}`;
+        }
+
+        function formatUptime(seconds) {
+            if (seconds === 0) return '00:00:00';
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            if (days > 0) {
+                return `${days}h ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            } else {
+                return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+        }
+
+        function updateRealtimeDisplay() {
+            const currentTime = getCurrentTime();
+            const uptime = getCurrentUptime();
+            const timeElement = document.getElementById('currentTime');
+            const dateElement = document.getElementById('currentDate');
+            const uptimeElement = document.getElementById('uptime');
+            if (timeElement && currentTime) {
+                const hours = String(currentTime.getHours()).padStart(2, '0');
+                const minutes = String(currentTime.getMinutes()).padStart(2, '0');
+                const seconds = String(currentTime.getSeconds()).padStart(2, '0');
+                timeElement.textContent = `${hours}:${minutes}:${seconds}`;
+            }
+            if (dateElement && currentTime) {
+                const day = String(currentTime.getDate()).padStart(2, '0');
+                const month = String(currentTime.getMonth() + 1).padStart(2, '0');
+                const year = currentTime.getFullYear();
+                dateElement.textContent = `${day}/${month}/${year}`;
+            }
+            if (uptimeElement) {
+                uptimeElement.textContent = formatUptime(uptime);
+            }
+        }
+        // ================================
+        // NOTIFICATION TOAST
+        // ================================
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast callout';
+            if (type === 'error') {
+                toast.classList.add('alert');
+            } else if (type === 'warning') {
+                toast.classList.add('warning');
+            } else {
+                toast.classList.add('success');
+            }
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 4000);
+        }
+        // ================================
+        // TOAST HELPER FUNCTION
+        // ================================
+        function showToastBeforeCountdown(message, type = 'warning', delay = 1500) {
+            showToast(message, type);
+
+            return new Promise(resolve => {
+                requestAnimationFrame(() => {
+                    setTimeout(resolve, delay);
+                });
+            });
+        }
+        // ================================
+        // COUNTDOWN MANAGER - SERVER-DRIVEN
+        // ================================
+        let isCountdownActive = false;
+        let countdownEndTime = 0;
+        let countdownReason = "";
+        let countdownMessage = "";
+        let countdownTotalSeconds = 0;
+        let countdownCheckInterval = null;
+        let lastKnownCountdownState = null;
+        let lastSuccessfulPoll = Date.now();
+        const POLL_TIMEOUT_MS = 10000;
+
+        let countdownUIInterval = null;
+
+        function startCountdownPolling() {
+            if (countdownCheckInterval) {
+                clearInterval(countdownCheckInterval);
+            }
+
+            lastSuccessfulPoll = Date.now();
+            checkCountdownStatus();
+
+            countdownCheckInterval = setInterval(() => {
+                checkCountdownStatus();
+
+                const timeSinceLastPoll = Date.now() - lastSuccessfulPoll;
+
+                if (timeSinceLastPoll > POLL_TIMEOUT_MS && isCountdownActive) {
+                }
+            }, 1000);
+        }
+
+        function stopCountdownPolling() {
+            if (countdownCheckInterval) {
+                clearInterval(countdownCheckInterval);
+                countdownCheckInterval = null;
+            }
+            if (countdownUIInterval) {
+                clearInterval(countdownUIInterval);
+                countdownUIInterval = null;
+            }
+        }
+
+        async function checkCountdownStatus() {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+                const response = await fetch('/api/countdown', {
+                    signal: controller.signal,
+                    cache: 'no-cache',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                lastSuccessfulPoll = Date.now();
+                lastKnownCountdownState = data;
+
+                if (data.active && data.remaining > 0) {
+
+                    if (!isCountdownActive) {
+                        const clientNow = Date.now();
+                        const bufferSeconds = 1;
+                        countdownEndTime = clientNow + ((data.remaining + bufferSeconds) * 1000);
+
+                        countdownReason = data.reason;
+                        countdownMessage = data.message;
+                        countdownTotalSeconds = data.total || data.remaining;
+
+                        startCountdownDisplay(data);
+                        startLocalCountdownTicker();
+                    } else {
+                        const serverRemaining = data.remaining;
+                        const localRemaining = Math.max(0, Math.floor((countdownEndTime - Date.now()) / 1000));
+                        const drift = Math.abs(serverRemaining - localRemaining);
+
+                        if (drift > 3) {
+                            const clientNow = Date.now();
+                            countdownEndTime = clientNow + (serverRemaining * 1000);
+                        }
+                    }
+                }
+                else if (data.active === false && isCountdownActive) {
+                    stopCountdownDisplay();
+                    return;
+                }
+
+            } catch (error) {
+                const timeSinceLastPoll = Date.now() - lastSuccessfulPoll;
+
+                if (timeSinceLastPoll > POLL_TIMEOUT_MS) {
+                }
+
+                if (error.name === 'AbortError') {
+                }
+            }
+        }
+        
+        function startLocalCountdownTicker() {
+            if (countdownUIInterval) {
+                clearInterval(countdownUIInterval);
+            }
+
+            countdownUIInterval = setInterval(() => {
+                if (!isCountdownActive) return;
+
+                const remaining = Math.max(
+                    0,
+                    Math.ceil((countdownEndTime - Date.now()) / 1000)
+                );
+
+                updateCountdownDisplay(remaining, countdownMessage);
+
+                if (remaining <= 0) {
+                    stopCountdownDisplay();
+                }
+            }, 100);
+        }
+
+        function startCountdownDisplay(data) {
+            if (isCountdownActive) return;
+
+            isCountdownActive = true;
+            document.body.classList.add('countdown-active');
+
+            const loadingBar = document.getElementById('countdownLoading');
+            const titleElement = document.getElementById('countdownTitle');
+
+            if (titleElement) {
+                titleElement.textContent = data.message || 'Memulai ulang proses';
+            }
+
+            loadingBar.style.display = 'flex';
+        }
+        function updateCountdownDisplay(remaining, message) {
+            const loadingBar = document.getElementById('countdownLoading');
+            const progressBar = document.getElementById('countdownProgressBar');
+            const progressContainer = progressBar?.closest('.progress');
+            const percentageElement = document.getElementById('countdownPercentage');
+            const titleElement = document.getElementById('countdownTitle');
+
+            if (!loadingBar) return;
+
+            const now = Date.now();
+            const elapsedMs = countdownTotalSeconds * 1000 - (countdownEndTime - now);
+            const percentage = Math.min(100, Math.max(0, Math.round((elapsedMs / (countdownTotalSeconds * 1000)) * 100)));
+
+            if (progressBar) progressBar.style.width = percentage + '%';
+            if (progressContainer) progressContainer.setAttribute('aria-valuenow', percentage);
+            if (percentageElement) percentageElement.textContent = percentage + '%';
+            if (titleElement) titleElement.textContent = message;
+
+            loadingBar.style.display = 'flex';
+        }
+        function stopCountdownDisplay() {
+            if (!isCountdownActive) return;
+
+            stopCountdownPolling();
+            forceRedirect();
+            isCountdownActive = false;
+        }
+        function forceRedirect() {
+            let targetURL = window.location.href;
+            const currentIP = window.location.hostname;
+            const isLocalAP = (currentIP.startsWith('192.168.100.1') || currentIP === '192.168.100.1');
+
+            if (countdownReason === 'factory_reset') {
+                targetURL = 'http://192.168.100.1';
+            } else if (countdownReason === 'ap_restart') {
+                if (isLocalAP) {
+                    const newIPInput = document.getElementById('apIP');
+                    const newIP = newIPInput ? newIPInput.value.trim() : '';
+
+                    if (newIP && newIP !== currentIP) {
+                        targetURL = `http://${newIP}`;
+                    } else {
+                        targetURL = window.location.href;
+                    }
+                }
+            } else if (countdownReason === 'device_restart') {
+                targetURL = window.location.href;
+            }
+            window.location.href = targetURL;
+        }
+        // ================================
+        // DEVICE STATUS UPDATE
+        // ================================
+        async function updateDeviceStatus() {
+            if (isLoadingDeviceStatus) {
+                return;
+            }
+            isLoadingDeviceStatus = true;
+            try {
+                const response = await fetch('/devicestatus');
+                const data = await response.json();
+                isOnline = data.connected === true;
+                document.getElementById('wifiName').textContent = data.ssid || 'Tidak terhubung';
+                document.getElementById('ipAddress').textContent = data.ip || '';
+                document.getElementById('ntpStatus').textContent = data.ntpSynced ? 'Tersinkron' : 'Tidak tersinkron';
+                if (document.getElementById('ntpServerUsed')) {
+                    document.getElementById('ntpServerUsed').textContent = data.ntpServer || '';
+                }
+
+                // Status WiFi berdasarkan wifiState
+                const statusBadge = document.getElementById('internetStatus');
+                switch (data.wifiState) {
+                    case 'connected':
+                        statusBadge.textContent = 'Terhubung';
+                        statusBadge.className = 'label success';
+                        break;
+                    case 'connecting':
+                        statusBadge.textContent = 'Menghubungkan...';
+                        statusBadge.className = 'label warning';
+                        break;
+                    case 'failed':
+                        statusBadge.textContent = 'Gagal';
+                        statusBadge.className = 'label alert';
+                        break;
+                    case 'idle':
+                        statusBadge.textContent = 'Tidak terkonfigurasi';
+                        statusBadge.className = 'label secondary';
+                        break;
+                    default:
+                        statusBadge.textContent = data.connected ? 'Terhubung' : 'Tidak terhubung';
+                        statusBadge.className = data.connected ? 'label success' : 'label alert';
+                }
+
+                // Kekuatan sinyal
+                const rssiEl = document.getElementById('rssiValue');
+                if (rssiEl) {
+                    if (data.rssi && data.rssi !== 0) {
+                        const rssi = data.rssi;
+                        const quality = rssi >= -50 ? 'Sangat Baik' : rssi >= -60 ? 'Baik' : rssi >= -70 ? 'Cukup' : 'Lemah';
+                        rssiEl.textContent = rssi + ' dBm (' + quality + ')';
+                    } else {
+                        rssiEl.textContent = '-';
+                    }
+                }
+                // ================================
+                // UPDATE TIME & DATE FROM SERVER
+                // ================================
+                if (data.currentTime && data.currentDate) {
+                    const timeParts = data.currentTime.split(':');
+                    const dateParts = data.currentDate.split('/');
+                    if (timeParts.length === 3 && dateParts.length === 3) {
+                        const now = new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]), parseInt(timeParts[0]), parseInt(timeParts[1]), parseInt(timeParts[2]));
+                        serverTimestamp = Math.floor(now.getTime() / 1000);
+                        localStartTime = Date.now();
+                        lastSyncTime = Date.now();
+                    }
+                }
+                if (data.uptime !== undefined) {
+                    serverUptimeStart = data.uptime;
+                }
+            } catch (error) {
+                isOnline = false;
+                const statusBadge = document.getElementById('internetStatus');
+                statusBadge.textContent = 'Terjadi kesalahan';
+                statusBadge.className = 'label alert';
+                const rssiEl = document.getElementById('rssiValue');
+                if (rssiEl) rssiEl.textContent = '-';
+            } finally {
+                isLoadingDeviceStatus = false;
+            }
+        }
+        // ================================
+        // LOAD LOCATION FUNCTION
+        // ================================
+
+        // ================================
+        // HANDLE CITY CHANGE FUNCTION
+        // ================================
+        // ================================
+        // RESET FUNCTION TO COORDINATES
+        // ================================
+        // ================================
+        // LOAD BUZZER CONFIG
+        // ================================
+
+        // ================================
+        // SIMPAN ALARM (dari picker)
+        // ================================
+
+        // ================================
+        // SAVE BUZZER TOGGLE
+        // ================================
+
+        // ================================
+        // SAVE BUZZER VOLUME
+        // ================================
+
+        // ================================
+        // ================================
+        // WIFI & AP SETTINGS
+        // ================================
+        let savedWiFiConfig = {
+            routerSSID: '',
+            routerPassword: '',
+            apSSID: '',
+            apPassword: ''
+        };
+        async function loadWiFiConfig() {
+            try {
+                const response = await fetch('/getwificonfig', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                const data = await response.json();
+                savedWiFiConfig.routerSSID = data.routerSSID || '';
+                savedWiFiConfig.routerPassword = data.routerPassword || '';
+                savedWiFiConfig.apSSID = data.apSSID || '';
+                savedWiFiConfig.apPassword = data.apPassword || '';
+                const wifiSSIDInput = document.getElementById('wifiSSID');
+                const wifiPasswordInput = document.getElementById('wifiPassword');
+                if (wifiSSIDInput) {
+                    wifiSSIDInput.value = savedWiFiConfig.routerSSID;
+                }
+                if (wifiPasswordInput) {
+                    wifiPasswordInput.value = savedWiFiConfig.routerPassword;
+                }
+                const apSSIDInput = document.getElementById('apSSID');
+                const apPasswordInput = document.getElementById('apPassword');
+                if (apSSIDInput) {
+                    apSSIDInput.value = savedWiFiConfig.apSSID;
+                }
+                if (apPasswordInput) {
+                    apPasswordInput.value = savedWiFiConfig.apPassword;
+                }
+                const apIPInput = document.getElementById('apIP');
+                const gatewayInput = document.getElementById('gatewayIP');
+                const subnetInput = document.getElementById('subnetMask');
+                if (apIPInput && data.apIP) apIPInput.value = data.apIP;
+                if (gatewayInput && data.apGateway) gatewayInput.value = data.apGateway;
+                if (subnetInput && data.apSubnet) subnetInput.value = data.apSubnet;
+                return true;
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function setWiFi() {
+            const ssid = document.getElementById('wifiSSID').value.trim();
+            const password = document.getElementById('wifiPassword').value;
+            if (!ssid) {
+                showToast('SSID WiFi tidak boleh kosong', 'error');
+                return;
+            }
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Menyimpan...';
+            fetch('/setwifi', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `ssid=${encodeURIComponent(ssid)}&password=${encodeURIComponent(password)}`
+            }).then(response => {
+                if (response.ok) {
+                    savedWiFiConfig.routerSSID = ssid;
+                    if (password) {
+                        savedWiFiConfig.routerPassword = password;
+                    }
+                    document.getElementById('wifiSSID').value = ssid;
+                    if (password) document.getElementById('wifiPassword').value = password;
+                    showToast('Pengaturan WiFi berhasil disimpan', 'success');
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                } else {
+                    throw new Error('Penyimpanan gagal');
+                }
+            }).catch(error => {
+                showToast('Gagal menyimpan WiFi', 'error');
+                btn.disabled = false;
+                btn.textContent = originalText;
+            });
+        }
+
+        function clearWiFiForm() {
+            loadWiFiConfig();
+        }
+
+        // ================================
+        // WIFI & AP SETTINGS
+        // ================================
+        function setAP() {
+            if (event && event.target) {
+                const buttonText = event.target.textContent.trim();
+
+                if (buttonText !== 'Simpan') {
+                    return;
+                }
+
+                const isAPCredButton = event.target.closest('.grid-x')?.querySelector('#apSSID') !== null;
+                if (!isAPCredButton) {
+                    return;
+                }
+            }
+
+            const ssid = document.getElementById('apSSID').value.trim();
+            const pass = document.getElementById('apPassword').value;
+
+            if (!ssid) {
+                showToast('SSID Access Point tidak boleh kosong', 'error');
+                return;
+            }
+
+            if (pass.length > 0 && pass.length < 8) {
+                showToast('Password minimal 8 karakter', 'error');
+                return;
+            }
+
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Menyimpan...';
+
+            const formData = new URLSearchParams();
+            formData.append('ssid', ssid);
+            formData.append('password', pass);
+            formData.append('updateNetworkConfig', 'false');
+
+            fetch('/setap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString()
+            })
+                .then(async response => {
+                    if (response.ok) {
+                        savedWiFiConfig.apSSID = ssid;
+                        if (pass) savedWiFiConfig.apPassword = pass;
+
+                        document.getElementById('apSSID').value = ssid;
+                        if (pass) document.getElementById('apPassword').value = pass;
+
+                        await showToastBeforeCountdown(
+                            `Access Point berhasil disimpan ${ssid}`,
+                            'success'
+                        );
+
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+
+                        startCountdownPolling();
+                    } else {
+                        return response.text().then(text => { throw new Error(text); });
+                    }
+                })
+                .catch(error => {
+                    showToast('Gagal menyimpan Access Point: ' + error.message, 'error');
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                });
+        }
+
+        function setAPNetwork() {
+            if (event && event.target) {
+                const buttonText = event.target.textContent.trim();
+
+                if (buttonText !== 'Simpan') {
+                    return;
+                }
+
+                const isNetworkConfigButton = event.target.closest('.grid-x')?.querySelector('#apIP') !== null;
+                if (!isNetworkConfigButton) {
+                    return;
+                }
+            }
+
+            const apIP = document.getElementById('apIP').value.trim();
+            const gateway = document.getElementById('gatewayIP').value.trim();
+            const subnet = document.getElementById('subnetMask').value.trim();
+
+            if (!apIP && !gateway && !subnet) {
+                showToast('Isi minimal satu field konfigurasi jaringan', 'error');
+                return;
+            }
+
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Menyimpan...';
+
+            const formData = new URLSearchParams();
+
+            formData.append('updateNetworkConfig', 'true');
+
+            if (apIP) formData.append('apIP', apIP);
+            if (gateway) formData.append('gateway', gateway);
+            if (subnet) formData.append('subnet', subnet);
+
+            fetch('/setap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString()
+            })
+                .then(async response => {
+                    if (response.ok) {
+                        if (apIP) document.getElementById('apIP').value = apIP;
+                        if (gateway) document.getElementById('gatewayIP').value = gateway;
+                        if (subnet) document.getElementById('subnetMask').value = subnet;
+
+                        const networkMsg = apIP ? apIP : '192.168.100.1';
+                        await showToastBeforeCountdown(
+                            `Konfigurasi jaringan berhasil disimpan ${networkMsg}`,
+                            'success'
+                        );
+
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+
+                        startCountdownPolling();
+                    } else {
+                        return response.text().then(text => { throw new Error(text); });
+                    }
+                })
+                .catch(error => {
+                    showToast('Gagal menyimpan konfigurasi: ' + error.message, 'error');
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                });
+        }
+
+        function clearAPForm() {
+            loadWiFiConfig();
+        }
+
+        function clearDHCPForm() {
+            loadWiFiConfig();
+        }
+
+        // ================================
+        // UPDATE TIME
+        // ================================
+        function syncTime() {
+            const d = new Date();
+
+            const year = d.getFullYear();
+            const month = d.getMonth() + 1;
+            const day = d.getDate();
+            const hour = d.getHours();
+            const minute = d.getMinutes();
+            const second = d.getSeconds();
+
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Perbarui...';
+
+            fetch('/synctime', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `y=${year}&m=${month}&d=${day}&h=${hour}&i=${minute}&s=${second}`
+            })
+                .then(response => response.text())
+                .then(data => {
+                    showToast('Waktu berhasil diperbarui', 'success');
+                    updateDeviceStatus();
+                    btn.disabled = false;
+                    btn.textContent = 'Perbarui Waktu';
+                })
+                .catch(error => {
+                    showToast('Gagal memperbarui waktu', 'error');
+                    btn.disabled = false;
+                    btn.textContent = ' Perbarui Waktu';
+                });
+        }
+
+        // ================================
+        // RESET PABRIK
+        // ================================
+        function resetSettings() {
+            if (!confirm('Apakah Anda ingin mengatur ulang semua pengaturan ke pengaturan ulang?')) {
+                return;
+            }
+
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Mengatur ulang...';
+
+            fetch('/reset', { method: 'POST' })
+                .then(async response => {
+                    if (response.ok) {
+                        await showToastBeforeCountdown(
+                            'Pengaturan dihapus, perangkat dimulai ulang',
+                            'success'
+                        );
+
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+
+                        startCountdownPolling();
+                    } else {
+                        throw new Error('Pengaturan ulang gagal');
+                    }
+                })
+                .catch(error => {
+                    showToast('Gagal mengatur ulang perangkat', 'error');
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                });
+        }
+
+        // ================================
+        // CITIES.JSON UPLOAD FUNCTION
+        // ================================
+
+        // ================================
+        // METHOD SELECTION FUNCTION
+        // ================================
+
+        async function restartDevice() {
+            if (!confirm('Apakah Anda ingin memulai ulang perangkat?')) {
+                return;
+            }
+
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Mulsi ulang...';
+
+            try {
+                const response = await fetch('/restart', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                });
+
+                if (response.ok) {
+                    await showToastBeforeCountdown('Memulai ulang perangkat', 'success');
+
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+
+                    startCountdownPolling();
+                } else {
+                    throw new Error('Mulai ulang gagal');
+                }
+            } catch (error) {
+                showToast('Gagal mulai ulang perangkat', 'error');
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        // ================================
+        // TIMEZONE FUNCTION - INLINE EDITING
+        // ================================
+        let isEditingTimezone = false;
+
+        function toggleTimezoneEdit() {
+            const displayText = document.getElementById('timezoneDisplayText');
+            const input = document.getElementById('timezoneInput');
+            const btn = document.getElementById('timezoneBtn');
+            const cancelBtn = document.getElementById('timezoneCancelBtn');
+
+            if (!isEditingTimezone) {
+                displayText.style.display = 'none';
+                input.style.display = 'inline-block';
+                input.value = timezoneConfig.offset >= 0 ? '+' + timezoneConfig.offset : timezoneConfig.offset;
+                input.focus();
+                input.select();
+                btn.textContent = '💾';
+                btn.title = 'Simpan Zona Waktu';
+                cancelBtn.style.display = 'inline-block';
+                isEditingTimezone = true;
+            } else {
+                saveTimezone();
+            }
+        }
+
+        function cancelTimezoneEdit() {
+            const displayText = document.getElementById('timezoneDisplayText');
+            const input = document.getElementById('timezoneInput');
+            const btn = document.getElementById('timezoneBtn');
+            const cancelBtn = document.getElementById('timezoneCancelBtn');
+
+            displayText.style.display = 'inline';
+            input.style.display = 'none';
+            btn.textContent = '🕐';
+            btn.title = 'Edit Zona Waktu';
+            cancelBtn.style.display = 'none';
+            isEditingTimezone = false;
+
+            input.value = timezoneConfig.offset >= 0 ? '+' + timezoneConfig.offset : timezoneConfig.offset;
+        }
+
+        async function loadTimezoneConfig() {
+            try {
+                const response = await fetch('/gettimezone', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+
+                const data = await response.json();
+
+                if (data.offset !== undefined) {
+                    timezoneConfig.offset = data.offset;
+                } else {
+                    timezoneConfig.offset = 7;
+                }
+
+                updateTimezoneDisplay();
+
+                return true;
+
+            } catch (error) {
+                timezoneConfig.offset = 7;
+                updateTimezoneDisplay();
+                return false;
+            }
+        }
+
+        function updateTimezoneDisplay() {
+            const displayText = document.getElementById('timezoneDisplayText');
+            const input = document.getElementById('timezoneInput');
+
+            const displayValue = (timezoneConfig.offset >= 0 ? '+' : '') + timezoneConfig.offset;
+
+            if (displayText) {
+                displayText.textContent = displayValue;
+            }
+            if (input) {
+                input.value = displayValue;
+            }
+        }
+
+        async function saveTimezone() {
+            const input = document.getElementById('timezoneInput');
+            const displayText = document.getElementById('timezoneDisplayText');
+            const btn = document.getElementById('timezoneBtn');
+            const cancelBtn = document.getElementById('timezoneCancelBtn');
+
+            let offsetStr = input.value.trim();
+
+            if (!offsetStr) {
+                showToast('Zona Waktu offset tidak boleh kosong', 'error');
+                input.focus();
+                return;
+            }
+
+            let offset = parseInt(offsetStr);
+
+            if (isNaN(offset)) {
+                showToast('Format tidak valid. Contoh: +7, -5, +8', 'error');
+                input.focus();
+                return;
+            }
+
+            if (offset < -12 || offset > 14) {
+                showToast('Offset harus antara -12 hingga +14', 'error');
+                input.focus();
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '...';
+
+            try {
+                const formData = new URLSearchParams();
+                formData.append('offset', offset);
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+                const response = await fetch('/settimezone', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json'
+                    },
+                    body: formData.toString(),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    const result = await response.json();
+
+                    timezoneConfig.offset = offset;
+
+                    const displayValue = (offset >= 0 ? '+' : '') + offset;
+                    displayText.textContent = displayValue;
+                    input.value = displayValue;
+
+                    displayText.style.display = 'inline';
+                    input.style.display = 'none';
+                    btn.textContent = '🕐';
+                    btn.title = 'Edit Zona Waktu';
+                    btn.disabled = false;
+                    isEditingTimezone = false;
+                    cancelBtn.style.display = 'none';
+
+                    showToast('Zona waktu berhasil disimpan', 'success');
+
+                    setTimeout(() => {
+                        showToast('NTP melakukan perbarui ulang dengan zona waktu baru...', 'warning');
+                    }, 1500);
+
+                } else {
+                    throw new Error('Gagal menyimpan zona waktu');
+                }
+
+            } catch (error) {
+                showToast('Gagal menyimpan zona waktu', 'error');
+
+                btn.textContent = '💾';
+                btn.disabled = false;
+                input.focus();
+            }
+        }
+
+        // ================================
+        // VANILLA JS TABS FUNCTIONALITY
+        // ================================
+        function initTabs() {
+            const tabLinks = document.querySelectorAll('.tabs a');
+            const tabPanels = document.querySelectorAll('.tabs-panel');
+
+            tabLinks.forEach(link => {
+                link.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href').substring(1);
+
+                    document.querySelectorAll('.tabs-title').forEach(tab => {
+                        tab.classList.remove('is-active');
+                    });
+                    tabPanels.forEach(panel => {
+                        panel.classList.remove('is-active');
+                    });
+
+                    this.parentElement.classList.add('is-active');
+                    document.getElementById(targetId).classList.add('is-active');
+
+                    handleTabClick(targetId);
+                });
+            });
+        }
+
+        // ================================
+        // INITIALIZATION
+        // ================================
+        async function initializeApp() {
+            const progressBar = document.getElementById('loadingProgress');
+            const percentage = document.getElementById('loadingPercentage');
+            const status = document.getElementById('loadingStatus');
+
+            let currentProgress = 0;
+
+            function updateProgress(targetProgress, message) {
+                return new Promise((resolve) => {
+                    const interval = setInterval(() => {
+                        if (currentProgress < targetProgress) {
+                            currentProgress += 1;
+                            if (progressBar) progressBar.style.width = currentProgress + '%';
+                            if (percentage) percentage.textContent = currentProgress + '%';
+                            if (status) status.textContent = message;
+                        } else {
+                            clearInterval(interval);
+                            resolve();
+                        }
+                    }, 20);
+                });
+            }
+
+            const LOADING_TIMEOUT = 10000;
+            let timeoutReached = false;
+
+            const timeoutTimer = setTimeout(() => {
+                timeoutReached = true;
+                if (status) status.textContent = 'Timeout - melanjutkan...';
+                setTimeout(() => {
+                    LoadingManager.completeLoading();
+                }, 500);
+            }, LOADING_TIMEOUT);
+
+            try {
+                if (status) status.textContent = 'Menyiapkan halaman...';
+                await updateProgress(10, 'Menyiapkan halaman...');
+
+                await cssLoaded;
+                await updateProgress(50, 'Menyiapkan tampilan...');
+
+                if (status) status.textContent = 'Mengecek status server...';
+                await updateProgress(60, 'Mengecek status server...');
+
+                try {
+                    const countdownCheck = await fetch('/api/countdown');
+                    const countdownData = await countdownCheck.json();
+
+                    if (countdownData.active && countdownData.remaining > 0) {
+
+                        await updateProgress(100, countdownData.message + '...');
+
+                        LoadingManager.completeLoading();
+
+                        const clientNow = Date.now();
+                        countdownEndTime = clientNow + (countdownData.remaining * 1000);
+                        countdownReason = countdownData.reason;
+                        countdownMessage = countdownData.message;
+                        countdownTotalSeconds = countdownData.total || countdownData.remaining;
+
+                        startCountdownDisplay(countdownData);
+                        startLocalCountdownTicker();
+                        startCountdownPolling();
+
+                        return;
+                    }
+                } catch (err) {
+                }
+
+                await updateProgress(90, 'Menyiapkan halaman...');
+                initTabs();
+
+                setInterval(updateRealtimeDisplay, 1000);
+
+                setInterval(() => {
+                    const activePanel = document.querySelector('.tabs-panel.is-active');
+                    const activeTab = activePanel ? activePanel.getAttribute('id') : null;
+
+                    if (activeTab === 'home') {
+                        updateDeviceStatus();
+                    }
+                }, 5000);
+
+                await updateProgress(100, 'Siap digunakan');
+                await new Promise(r => setTimeout(r, 300));
+
+                clearTimeout(timeoutTimer);
+
+                LoadingManager.completeLoading();
+
+            } catch (error) {
+                clearTimeout(timeoutTimer);
+
+                if (status) status.textContent = 'Error: ' + error.message;
+                await updateProgress(100, 'Selesai dengan error');
+
+                setTimeout(() => {
+                    LoadingManager.completeLoading();
+                }, 1500);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            setTimeout(() => {
+                forceRemoveLoadingState();
+            }, 15000);
+
+            LoadingManager.updateProgress(1, 'Action');
+
+            initializeApp();
+
+            setTimeout(() => {
+                handleTabClick('home');
+            }, 500);
+
+            const wifiCredInputs = document.querySelectorAll('input[data-form="wifi-credentials"]');
+            const apCredInputs = document.querySelectorAll('input[data-form="ap-credentials"]');
+            const networkConfigInputs = document.querySelectorAll('input[data-form="network-config"]');
+
+            wifiCredInputs.forEach(input => {
+                input.addEventListener('change', function(e) {
+                    e.stopPropagation();
+                });
+            });
+
+            apCredInputs.forEach(input => {
+                input.addEventListener('change', function(e) {
+                    e.stopPropagation();
+                });
+            });
+
+            networkConfigInputs.forEach(input => {
+                input.addEventListener('change', function(e) {
+                    e.stopPropagation();
+                });
+            });
+            });
+
+            // ================================
+            // ESC KEY HANDLER
+            // ================================
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    if (isEditingTimezone) {
+                        cancelTimezoneEdit();
+                    }
+
+                    const clearBtn = document.getElementById('clearFileBtn');
+                    if (clearBtn && clearBtn.style.display === 'block') {
+                        clearSelectedFile();
+                    }
+                }
+            });
+
+            // ================================
+            // VALIDATE IP ADDRESS INPUT
+            // ================================
+            const apIPInput = document.getElementById('apIP');
+            const gatewayInput = document.getElementById('gatewayIP');
+            const subnetInput = document.getElementById('subnetMask');
+
+            function validateIPAddress(ip) {
+                const ipPattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+                const match = ip.match(ipPattern);
+
+                if (!match) return false;
+
+                for (let i = 1; i <= 4; i++) {
+                    const octet = parseInt(match[i]);
+                    if (octet < 0 || octet > 255) return false;
+                }
+
+                return true;
+            }
+
+            function setupIPInput(input, fieldName) {
+                if (!input) return;
+
+                input.addEventListener('keydown', function (e) {
+                    if ([8, 9, 27, 13, 37, 38, 39, 40, 46].indexOf(e.keyCode) !== -1 ||
+                        (e.keyCode === 65 && e.ctrlKey === true) ||
+                        (e.keyCode === 67 && e.ctrlKey === true) ||
+                        (e.keyCode === 86 && e.ctrlKey === true) ||
+                        (e.keyCode === 88 && e.ctrlKey === true) ||
+                        (e.keyCode === 65 && e.metaKey === true) ||
+                        (e.keyCode === 67 && e.metaKey === true) ||
+                        (e.keyCode === 86 && e.metaKey === true) ||
+                        (e.keyCode === 88 && e.metaKey === true)) {
+                        return;
+                    }
+
+                    const char = e.key;
+                    if (!/^[\d\.]$/.test(char)) {
+                        e.preventDefault();
+                    }
+                });
+
+                input.addEventListener('blur', function () {
+                    const value = this.value.trim();
+
+                    if (value === '') {
+                        this.style.borderColor = '';
+                        return;
+                    }
+
+                    if (!validateIPAddress(value)) {
+                        showToast(`${fieldName} tidak valid. Format: xxx.xxx.xxx.xxx (0-255)`, 'warning');
+                        this.style.borderColor = '#cc4b37';
+                    } else {
+                        this.style.borderColor = '#3adb76';
+                    }
+                });
+
+                input.addEventListener('input', function () {
+                    const value = this.value;
+
+                    if (/[^\d\.]/.test(value)) {
+                        this.value = value.replace(/[^\d\.]/g, '');
+                    }
+
+                    if (/\.{2,}/.test(value)) {
+                        this.value = value.replace(/\.{2,}/g, '.');
+                    }
+
+                    const dots = (value.match(/\./g) || []).length;
+                    if (dots > 3) {
+                        const parts = value.split('.');
+                        this.value = parts.slice(0, 4).join('.');
+                    }
+
+                    const parts = value.split('.');
+                    const validParts = parts.map(part => {
+                        if (part.length > 3) {
+                            return part.substring(0, 3);
+                        }
+                        return part;
+                    });
+
+                    if (validParts.join('.') !== value) {
+                        this.value = validParts.join('.');
+                    }
+                });
+            }
+
+            setupIPInput(apIPInput, 'IP Address Access Point');
+            setupIPInput(gatewayInput, 'Gateway');
+            setupIPInput(subnetInput, 'Subnet Mask');
+
+            // ================================
+            // TIMEZONE INPUT - ENTER KEY TO SAVE
+            // ================================
+            const timezoneInput = document.getElementById('timezoneInput');
+            if (timezoneInput) {
+                timezoneInput.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' && isEditingTimezone) {
+                        e.preventDefault();
+                        saveTimezone();
+                    }
+
+                    if (e.key === 'Escape' && isEditingTimezone) {
+                        e.preventDefault();
+                        cancelTimezoneEdit();
+                    }
+
+                    if ([8, 9, 27, 13, 37, 38, 39, 40, 46].indexOf(e.keyCode) !== -1 ||
+                        (e.keyCode === 65 && e.ctrlKey === true) ||
+                        (e.keyCode === 67 && e.ctrlKey === true) ||
+                        (e.keyCode === 86 && e.ctrlKey === true) ||
+                        (e.keyCode === 88 && e.ctrlKey === true) ||
+                        (e.keyCode === 65 && e.metaKey === true) ||
+                        (e.keyCode === 67 && e.metaKey === true) ||
+                        (e.keyCode === 86 && e.metaKey === true) ||
+                        (e.keyCode === 88 && e.metaKey === true)) {
+                        return;
+                    }
+
+                    const char = e.key;
+                    if (!/^[\d\+\-]$/.test(char)) {
+                        e.preventDefault();
+                    }
+                });
+            }
+
+            // ================================
+            // VISIBILITY CHANGE - PAUSE/RESUME UPDATES
+            // ================================
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden) {
+                } else {
+                    forceRemoveLoadingState();
+
+                    updateDeviceStatus();
+                }
+            });
+
+            // ================================
+            // WINDOW BEFOREUNLOAD - WARN IF EDITING
+            // ================================
+            window.addEventListener('beforeunload', function (e) {
+                if (isEditingTimezone) {
+                    e.preventDefault();
+                    e.returnValue = 'Anda sedang mengedit zona waktu. Yakin ingin meninggalkan halaman?';
+                    return e.returnValue;
+                }
+
+                const clearBtn = document.getElementById('clearFileBtn');
+                if (clearBtn && clearBtn.style.display === 'block') {
+                    e.preventDefault();
+                    e.returnValue = 'Berkas tidak diupload. Yakin ingin meninggalkan halaman?';
+                    return e.returnValue;
+                }
+            });
+
+            // ================================
+            // ONLINE/OFFLINE DETECTION
+            // ================================
+            window.addEventListener('online', function () {
+                setTimeout(() => {
+                    updateDeviceStatus();
+                }, 1000);
+            }, 1000);
+
+            window.addEventListener('offline', function () {
+            });
+
+    </script>
+</body>
+</html>
