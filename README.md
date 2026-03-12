@@ -361,7 +361,7 @@ LED mati           → WiFi tidak dikonfigurasi
 ```
 ⚠️ GANTI SETELAH BOOT PERTAMA
 
-AP SSID:     JWS-(id unik)
+AP SSID:     WifiManager-(id unik)
 AP Password: 12345678
 AP IP:       192.168.100.1
 ```
