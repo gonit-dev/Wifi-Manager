@@ -632,17 +632,38 @@ void setupServerRoutes() {
       startCountdown("device_restart", "Memulai Ulang Perangkat", 60);
       request->send(200, "text/plain", "OK");
       xTaskCreate([](void* param) {
+          // Register task ini ke WDT agar tidak di-kick sebelum countdown selesai
+          esp_task_wdt_add(NULL);
+
           for (int i = 60; i > 0; i--) {
+              esp_task_wdt_reset(); // Reset WDT setiap detik selama countdown
+
               if (i == 35) {
+                  // PENTING: Unregister task dari WDT SEBELUM di-suspend,
+                  // supaya WDT tidak timeout karena task ter-register tidak bisa reset
+                  if (wifiTaskHandle != NULL) {
+                      esp_task_wdt_delete(wifiTaskHandle);
+                      vTaskSuspend(wifiTaskHandle);
+                  }
+                  if (ntpTaskHandle != NULL) {
+                      esp_task_wdt_delete(ntpTaskHandle);
+                      vTaskSuspend(ntpTaskHandle);
+                  }
+                  if (webTaskHandle != NULL) {
+                      esp_task_wdt_delete(webTaskHandle);
+                  }
+
                   WiFi.mode(WIFI_OFF); vTaskDelay(pdMS_TO_TICKS(500));
-                  if (ntpTaskHandle != NULL) vTaskSuspend(ntpTaskHandle);
-                  if (wifiTaskHandle != NULL) vTaskSuspend(wifiTaskHandle);
-                  vTaskDelay(pdMS_TO_TICKS(1000));
                   server.end(); vTaskDelay(pdMS_TO_TICKS(500));
                   if (rtcAvailable) saveTimeToRTC();
+                  vTaskDelay(pdMS_TO_TICKS(500));
               }
               vTaskDelay(pdMS_TO_TICKS(1000));
           }
+
+          esp_task_wdt_delete(NULL); // Unregister sebelum restart
+          Serial.flush();
+          delay(1000);
           ESP.restart();
       }, "DeviceRestartTask", 5120, NULL, 1, &restartTaskHandle);
   });
@@ -940,17 +961,37 @@ void setupServerRoutes() {
       request->send(200, "text/plain", "OK");
 
       xTaskCreate([](void* param) {
+          // Register task ini ke WDT agar tidak di-kick sebelum countdown selesai
+          esp_task_wdt_add(NULL);
+
           for (int i = 60; i > 0; i--) {
+              esp_task_wdt_reset(); // Reset WDT setiap detik selama countdown
+
               if (i == 35) {
+                  // PENTING: Unregister task dari WDT SEBELUM di-suspend,
+                  // supaya WDT tidak timeout karena task ter-register tidak bisa reset
+                  if (wifiTaskHandle != NULL) {
+                      esp_task_wdt_delete(wifiTaskHandle);
+                      vTaskSuspend(wifiTaskHandle);
+                  }
+                  if (ntpTaskHandle != NULL) {
+                      esp_task_wdt_delete(ntpTaskHandle);
+                      vTaskSuspend(ntpTaskHandle);
+                  }
+                  if (webTaskHandle != NULL) {
+                      esp_task_wdt_delete(webTaskHandle);
+                  }
+
                   WiFi.disconnect(true); vTaskDelay(pdMS_TO_TICKS(500));
                   WiFi.mode(WIFI_OFF); vTaskDelay(pdMS_TO_TICKS(500));
-                  if (ntpTaskHandle != NULL) vTaskSuspend(ntpTaskHandle);
-                  if (wifiTaskHandle != NULL) vTaskSuspend(wifiTaskHandle);
-                  vTaskDelay(pdMS_TO_TICKS(1000));
                   server.end(); vTaskDelay(pdMS_TO_TICKS(500));
               }
               vTaskDelay(pdMS_TO_TICKS(1000));
           }
+
+          esp_task_wdt_delete(NULL); // Unregister sebelum restart
+          Serial.flush();
+          delay(1000);
           ESP.restart();
       }, "FactoryResetTask", 5120, NULL, 1, &resetTaskHandle);
   });
