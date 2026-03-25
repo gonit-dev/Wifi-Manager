@@ -649,13 +649,11 @@ void setupServerRoutes() {
 
   // Konfigurasi WiFi
   server.on("/getwificonfig", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String json = "{";
+    char routerSSID[64] = "", routerPassword[64] = "";
     if (xSemaphoreTake(wifiMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-      json += "\"routerSSID\":\"" + wifiConfig.routerSSID + "\",";
-      json += "\"routerPassword\":\"" + wifiConfig.routerPassword + "\",";
+      strncpy(routerSSID,     wifiConfig.routerSSID.c_str(),     sizeof(routerSSID) - 1);
+      strncpy(routerPassword, wifiConfig.routerPassword.c_str(), sizeof(routerPassword) - 1);
       xSemaphoreGive(wifiMutex);
-    } else {
-      json += "\"routerSSID\":\"\",\"routerPassword\":\"\",";
     }
     String currentAPSSID = WiFi.softAPSSID();
     if (currentAPSSID.length() == 0) currentAPSSID = String(wifiConfig.apSSID);
@@ -663,13 +661,18 @@ void setupServerRoutes() {
     String apPassword = String(wifiConfig.apPassword);
     if (apPassword.length() == 0) apPassword = DEFAULT_AP_PASSWORD;
 
-    json += "\"apSSID\":\"" + currentAPSSID + "\",";
-    json += "\"apPassword\":\"" + apPassword + "\",";
-    json += "\"apIP\":\"" + wifiConfig.apIP.toString() + "\",";
-    json += "\"apGateway\":\"" + wifiConfig.apGateway.toString() + "\",";
-    json += "\"apSubnet\":\"" + wifiConfig.apSubnet.toString() + "\"";
-    json += "}";
-    sendJSONResponse(request, json);
+    char buf[512];
+    snprintf(buf, sizeof(buf),
+      "{\"routerSSID\":\"%s\",\"routerPassword\":\"%s\","
+      "\"apSSID\":\"%s\",\"apPassword\":\"%s\","
+      "\"apIP\":\"%s\",\"apGateway\":\"%s\",\"apSubnet\":\"%s\"}",
+      routerSSID, routerPassword,
+      currentAPSSID.c_str(), apPassword.c_str(),
+      wifiConfig.apIP.toString().c_str(),
+      wifiConfig.apGateway.toString().c_str(),
+      wifiConfig.apSubnet.toString().c_str()
+    );
+    sendJSONResponse(request, String(buf));
   });
 
   server.on("/setwifi", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -757,13 +760,15 @@ void setupServerRoutes() {
     IPAddress clientNetwork(clientIP[0]&apSubnet[0], clientIP[1]&apSubnet[1], clientIP[2]&apSubnet[2], clientIP[3]&apSubnet[3]);
     bool isLocalAP = (apNetwork == clientNetwork);
 
-    String json = "{";
-    json += "\"isLocalAP\":" + String(isLocalAP ? "true" : "false") + ",";
-    json += "\"clientIP\":\"" + clientIP.toString() + "\",";
-    json += "\"apIP\":\"" + apIP.toString() + "\",";
-    json += "\"apSubnet\":\"" + apSubnet.toString() + "\"";
-    json += "}";
-    sendJSONResponse(request, json);
+    char buf[192];
+    snprintf(buf, sizeof(buf),
+      "{\"isLocalAP\":%s,\"clientIP\":\"%s\",\"apIP\":\"%s\",\"apSubnet\":\"%s\"}",
+      isLocalAP ? "true" : "false",
+      clientIP.toString().c_str(),
+      apIP.toString().c_str(),
+      apSubnet.toString().c_str()
+    );
+    sendJSONResponse(request, String(buf));
   });
 
   // Sinkronisasi waktu manual
@@ -779,7 +784,7 @@ void setupServerRoutes() {
       int i = request->getParam("i",true)->value().toInt();
       int s = request->getParam("s",true)->value().toInt();
 
-      if (xSemaphoreTake(timeMutex, portMAX_DELAY) == pdTRUE) {
+      if (xSemaphoreTake(timeMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
         setTime(h, i, s, d, m, y);
         timeConfig.currentTime = now();
         timeConfig.ntpSynced = true;
@@ -794,13 +799,14 @@ void setupServerRoutes() {
 
   // Timezone
   server.on("/gettimezone", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String json = "{";
+    char buf[32];
     if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-      json += "\"offset\":" + String(timezoneOffset);
+      snprintf(buf, sizeof(buf), "{\"offset\":%d}", timezoneOffset);
       xSemaphoreGive(settingsMutex);
-    } else { json += "\"offset\":7"; }
-    json += "}";
-    sendJSONResponse(request, json);
+    } else {
+      snprintf(buf, sizeof(buf), "{\"offset\":7}");
+    }
+    sendJSONResponse(request, String(buf));
   });
 
   server.on("/settimezone", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -811,7 +817,7 @@ void setupServerRoutes() {
       if (offset < -12 || offset > 14) {
         request->send(400, "application/json", "{\"error\":\"Invalid offset\"}"); return;
       }
-      if (xSemaphoreTake(settingsMutex, portMAX_DELAY) == pdTRUE) {
+      if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
         timezoneOffset = offset; xSemaphoreGive(settingsMutex);
       }
       bool ntpTriggered = false;
@@ -822,8 +828,12 @@ void setupServerRoutes() {
         xTaskNotifyGive(ntpTaskHandle);
         ntpTriggered = true;
       }
-      request->send(200, "application/json",
-        "{\"success\":true,\"offset\":" + String(offset) + ",\"ntpTriggered\":" + String(ntpTriggered ? "true" : "false") + "}");
+      char buf[64];
+      snprintf(buf, sizeof(buf),
+        "{\"success\":true,\"offset\":%d,\"ntpTriggered\":%s}",
+        offset, ntpTriggered ? "true" : "false"
+      );
+      request->send(200, "application/json", buf);
       vTaskDelay(pdMS_TO_TICKS(50));
       saveTimezoneConfig();
   });
@@ -871,20 +881,27 @@ void setupServerRoutes() {
 
   // Countdown status
   server.on("/api/countdown", HTTP_GET, [](AsyncWebServerRequest *request) {
-      String json = "{";
+      char buf[256];
       if (countdownMutex != NULL && xSemaphoreTake(countdownMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        json += "\"active\":" + String(countdownState.isActive ? "true" : "false") + ",";
-        json += "\"remaining\":" + String(getRemainingSeconds()) + ",";
-        json += "\"total\":" + String(countdownState.totalSeconds) + ",";
-        json += "\"message\":\"" + countdownState.message + "\",";
-        json += "\"reason\":\"" + countdownState.reason + "\",";
-        json += "\"serverTime\":" + String(millis());
+        snprintf(buf, sizeof(buf),
+          "{\"active\":%s,\"remaining\":%d,\"total\":%d,"
+          "\"message\":\"%s\",\"reason\":\"%s\",\"serverTime\":%lu}",
+          countdownState.isActive ? "true" : "false",
+          getRemainingSeconds(),
+          countdownState.totalSeconds,
+          countdownState.message.c_str(),
+          countdownState.reason.c_str(),
+          millis()
+        );
         xSemaphoreGive(countdownMutex);
       } else {
-        json += "\"active\":false,\"remaining\":0,\"total\":0,\"message\":\"\",\"reason\":\"\",\"serverTime\":" + String(millis());
+        snprintf(buf, sizeof(buf),
+          "{\"active\":false,\"remaining\":0,\"total\":0,"
+          "\"message\":\"\",\"reason\":\"\",\"serverTime\":%lu}",
+          millis()
+        );
       }
-      json += "}";
-      sendJSONResponse(request, json);
+      sendJSONResponse(request, String(buf));
   });
 
   // Reset pabrik (wifi, ap, timezone)
@@ -895,7 +912,7 @@ void setupServerRoutes() {
       if (LittleFS.exists("/ap_creds.txt"))    LittleFS.remove("/ap_creds.txt");
       if (LittleFS.exists("/timezone.txt"))    LittleFS.remove("/timezone.txt");
 
-      if (xSemaphoreTake(settingsMutex, portMAX_DELAY) == pdTRUE) {
+      if (xSemaphoreTake(settingsMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
           wifiConfig.routerSSID = "";
           wifiConfig.routerPassword = "";
           wifiConfig.isConnected = false;
@@ -909,7 +926,7 @@ void setupServerRoutes() {
 
       timezoneOffset = 7;
 
-      if (xSemaphoreTake(timeMutex, portMAX_DELAY) == pdTRUE) {
+      if (xSemaphoreTake(timeMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
           const time_t EPOCH_2000 = 946684800;
           setTime(0, 0, 0, 1, 1, 2000);
           timeConfig.currentTime = EPOCH_2000;
